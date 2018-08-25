@@ -107,13 +107,14 @@ pattern, stencil, image etc)."))
   (flet ((transform (parameter)
            (logand (logand (truncate (* parameter 255)) 255))))
     (etypecase element
+      ((unsigned-byte 32) element)
       (color (with-slots (red green blue) element
                (logior (ash (transform red)   24)
                        (ash (transform green) 16)
                        (ash (transform blue)   8)
                        255)))
       ;; If no color is supplied, we assume black
-      (opacity (transform (opacity-value element)))
+      (opacity (logior #xffffff00 (transform (opacity-value element))))
       ;; Uniform-compositium is a masked-compositum rgb + opacity
       (uniform-compositum
        (let ((ink (compositum-ink element))
@@ -129,7 +130,19 @@ pattern, stencil, image etc)."))
 (defgeneric %pattern-rgba-value (pattern x y)
   (:documentation "Returns a collapsed RGBA value for position [X, Y].")
   (:method ((pattern %rgba-pattern) (x fixnum) (y fixnum))
-    (aref (pattern-array pattern) y x)))
+    (let ((array (pattern-array pattern)))
+      (if (array-in-bounds-p array y x)
+          (aref (pattern-array pattern) y x)
+          #x00000000)))
+  (:method ((pattern indirect-ink) x y)
+    (case pattern
+      (+foreground-ink+ #x000000ff)
+      (+background-ink+ #xffffffff)
+      (otherwise        #xff88ffff)))
+  (:method (design x y) ;; fallback method for uniform designs
+    (declare (ignore x y))
+    (check-type design (or color opacity uniform-compositum))
+    (%rgba-value design)))
 
 (defgeneric %collapse-pattern (pattern)
   (:documentation "Returns a %RGBA-PATTERN with colors.")
@@ -287,21 +300,21 @@ identity-transformation) then source pattern is returned."
   (labels ((effective-transformation (p)
              (let* ((pattern* (transformed-design-design p))
                     (transformation (transformed-design-transformation p)))
-               (etypecase pattern*
-                 (transformed-pattern
+               (typecase pattern*
+                 (transformed-design
                   (compose-transformations (effective-transformation pattern*)
                                            transformation))
-                 (pattern
+                 (otherwise
                   (setf source-pattern pattern*)
                   transformation)))))
-    (etypecase pattern
-      (transformed-pattern
+    (typecase pattern
+      (transformed-design
        (if (identity-transformation-p (transformed-design-transformation pattern))
            source-pattern
            (make-instance 'transformed-pattern
                           :design source-pattern
                           :transformation (effective-transformation pattern))))
-      (pattern pattern))))
+      (otherwise pattern))))
 
 ;;; this is not right (bounding rectangle of a transformed region)
 (defmethod pattern-width ((pattern transformed-pattern))
@@ -317,3 +330,19 @@ identity-transformation) then source pattern is returned."
       (make-instance 'transformed-pattern
                      :transformation transformation
                      :design design)))
+
+(defmethod %pattern-rgba-value ((pattern transformed-pattern) x y)
+  (let* ((effective-pattern (effective-transformed-pattern pattern))
+         (source-pattern (transformed-design-design effective-pattern))
+         (transformation (transformed-design-transformation effective-pattern))
+         (inv-tr (invert-transformation transformation)))
+    (with-transformed-position (inv-tr x y)
+      (%pattern-rgba-value source-pattern (round x) (round y)))))
+
+(defmethod %pattern-rgba-value ((pattern transformed-design) x y)
+  (let* ((effective-pattern (effective-transformed-pattern pattern))
+         (source-pattern (transformed-design-design effective-pattern))
+         (transformation (transformed-design-transformation effective-pattern))
+         (inv-tr (invert-transformation transformation)))
+    (with-transformed-position (inv-tr x y)
+      (%pattern-rgba-value source-pattern (round x) (round y)))))

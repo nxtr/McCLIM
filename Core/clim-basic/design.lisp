@@ -382,9 +382,12 @@
     :reader transformed-design-design)))
 
 (defmethod transform-region (transformation (design design))
-  (make-instance 'transformed-design
-                 :transformation transformation
-                 :design design))
+  (if (or (identity-transformation-p transformation)
+          (typep design '(or color opacity uniform-compositum standard-flipping-ink indirect-ink)))
+      design
+      (make-instance 'transformed-design
+                     :transformation transformation
+                     :design design)))
 
 
 ;;;
