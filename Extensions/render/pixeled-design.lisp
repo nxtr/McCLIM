@@ -134,11 +134,12 @@
 ;;;
 (defgeneric %make-pixeled-design (design))
 
-(defgeneric make-pixeled-design (design &key foreground background)
-  (:method (design &key foreground background)
-    (let ((*pixeled-foreground-design* (or foreground *pixeled-foreground-design*))
-          (*pixeled-background-design* (or background *pixeled-background-design*)))
-      (%make-pixeled-design design))))
+(defun make-pixeled-design (design &key foreground background)
+  (let ((*pixeled-foreground-design* (or foreground *pixeled-foreground-design*))
+        (*pixeled-background-design* (or background *pixeled-background-design*)))
+    (if (typep design '(or color opacity climi::uniform-compositum))
+        design
+        (%make-pixeled-design design))))
 
 (defmethod %make-pixeled-design (ink)
   (error "unknow how to make an rgba design of the ~A" ink))
@@ -158,22 +159,8 @@
   (%make-pixeled-design *pixeled-background-design*))
 
 (defun make-flipping-fn (design1 design2)
-  (let ((d1 (pixeled-rgba-fn (%make-pixeled-design design1)))
-	(d2 (pixeled-rgba-fn (%make-pixeled-design design2))))
-    (declare (type pixeled-design-fn d1 d2))
-    (make-pixeled-flipping-design
-     :color-fn (lambda (x y)
-		 (multiple-value-bind (r.d1 g.d1 b.d1 a.d1)
-		     (funcall d1 x y)
-		   (declare (ignore a.d1))
-		   (multiple-value-bind (r.d2 g.d2 b.d2 a.d2)
-		       (funcall d2 x y)
-		     (declare (ignore a.d2))
-		     (values
-		      (logxor r.d1 r.d2)
-		      (logxor g.d1 g.d2)
-		      (logxor b.d1 b.d2)
-		      255)))))))
+  (declare (ignore design1 design2))
+  +dark-red+)
 
 (defmethod %make-pixeled-design ((ink (eql +flipping-ink+)))
   (make-flipping-fn *pixeled-background-design* *pixeled-foreground-design*))
@@ -181,20 +168,6 @@
 (defmethod %make-pixeled-design ((ink standard-flipping-ink))
   (with-slots (climi::design1 climi::design2) ink
     (make-flipping-fn climi::design1 climi::design2)))
-
-(defmethod %make-pixeled-design ((ink %transparent-ink))
-  (make-pixeled-uniform-design
-   :red 0
-   :green 0
-   :blue 0
-   :alpha 0))
-
-(defmethod %make-pixeled-design ((ink standard-opacity))
-  (make-pixeled-uniform-design
-   :red 255
-   :green 255
-   :blue 255
-   :alpha (color-value->octet (opacity-value ink))))
 
 (defmethod %make-pixeled-design ((ink indexed-pattern))
   (let* ((width (clim:pattern-width ink))
@@ -360,13 +333,3 @@
                  :region (make-rectangle* 0 0
                                           (1- (pattern-width ink))
                                           (1- (pattern-height ink)))))
-
-;;;
-;;; design fix
-;;;
-
-(defmethod clim:transform-region (transformation (design named-color))
-  design)
-
-(defmethod clim:transform-region (transformation (design standard-flipping-ink))
-  design)

@@ -252,7 +252,6 @@
          (dy (round y))
          (sx (round stencil-dx))
          (sy (round stencil-dy))
-         (src-fn (pixeled-rgba-fn design))
          (dst-array (climi::pattern-array image))
          (x2 (+ dx width -1))
          (y2 (+ dy height -1)))
@@ -261,7 +260,7 @@
              do (let ((alpha (if (null stencil)
                                  #xff
                                  (climi::%pattern-rgba-value stencil (+ sx i) (+ sy j)))))
-                  (multiple-value-bind (r.fg g.fg b.fg a.fg) (funcall src-fn i j)
+                  (let-rgba ((r.fg g.fg b.fg a.fg) (climi::%pattern-rgba-value design i j))
                     (let-rgba ((r.bg g.bg b.bg a.bg) (aref dst-array j i))
                       (setf (aref dst-array j i)
                             (octet-blend-function* r.fg g.fg b.fg (%octet-mult a.fg alpha)
