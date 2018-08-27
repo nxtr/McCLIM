@@ -22,26 +22,6 @@
         (pixeled-rgba-unsafe-fn design)
         (call-next-method))))
 
-;;;
-;;; Uniform Design
-;;;
-(defclass pixeled-uniform-design (pixeled-design)
-  ((red :initarg :red :type octet :initform 0
-        :accessor pixeled-uniform-design-red)
-   (green :initarg :green :type octet :initform 0
-          :accessor pixeled-uniform-design-green)
-   (blue :initarg :blue :type octet :initform 0
-         :accessor pixeled-uniform-design-blue)
-   (alpha :initarg :alpha :type octet :initform 0
-          :accessor pixeled-uniform-design-alpha)))
-
-(defmethod climi::%pattern-rgba-value ((pattern pixeled-uniform-design) x y)
-  (with-slots (red green blue alpha) pattern
-    (dpb red (byte 8 24)
-         (dpb green (byte 8 16)
-              (dpb blue (byte 8 8)
-                   alpha)))))
-
 (defmethod climi::%pattern-rgba-value ((pattern pixeled-design) x y)
   (multiple-value-bind (red green blue alpha) (funcall (pixeled-rgba-fn pattern) x y)
     (dpb red (byte 8 24)
@@ -49,23 +29,8 @@
               (dpb blue (byte 8 8)
                    (or alpha 255))))))
 
-(defun make-pixeled-uniform-design (&key (red 0) (green 0) (blue 0) (alpha 255))
-  (make-instance 'pixeled-uniform-design :red red :green green :blue blue :alpha alpha))
-
-(defmethod pixeled-rgba-fn ((design pixeled-uniform-design))
-  (with-slots (red green blue alpha region)
-      design
-    (lambda (x y)
-      (if (clim:region-contains-position-p region x y)
-          (values red green blue alpha)
-          (values 0 0 0 0)))))
-
-(defmethod pixeled-rgba-unsafe-fn ((design pixeled-uniform-design))
-  (with-slots (red green blue alpha region)
-      design
-    (lambda (x y)
-      (declare (ignore x y))
-      (values red green blue alpha))))
+(defmethod pixeled-design-region ((object pattern))
+  (make-bounding-rectangle 0 0 (pattern-width object) (pattern-height object)))
 
 ;;;
 ;;; Functiona Design
@@ -137,26 +102,16 @@
 (defun make-pixeled-design (design &key foreground background)
   (let ((*pixeled-foreground-design* (or foreground *pixeled-foreground-design*))
         (*pixeled-background-design* (or background *pixeled-background-design*)))
-    (if (typep design '(or color opacity climi::uniform-compositum))
-        design
-        (%make-pixeled-design design))))
+    (typecase design
+      ((or color opacity climi::uniform-compositum) design)
+      (climi::indirect-ink
+       (cond ((eql design +foreground-ink+) *pixeled-foreground-design*)
+             ((eql design +background-ink+) *pixeled-background-design*)
+             (T design)))
+      (otherwise (%make-pixeled-design design)))))
 
 (defmethod %make-pixeled-design (ink)
   (error "unknow how to make an rgba design of the ~A" ink))
-
-(defmethod %make-pixeled-design ((ink named-color))
-  (multiple-value-bind (red green blue) (color-rgb ink)
-    (make-pixeled-uniform-design
-     :red (color-value->octet red)
-     :green (color-value->octet green)
-     :blue (color-value->octet blue)
-     :alpha 255)))
-
-(defmethod %make-pixeled-design ((ink (eql +foreground-ink+)))
-  (%make-pixeled-design *pixeled-foreground-design*))
-
-(defmethod %make-pixeled-design ((ink (eql +background-ink+)))
-  (%make-pixeled-design *pixeled-background-design*))
 
 (defun make-flipping-fn (design1 design2)
   (declare (ignore design1 design2))
@@ -170,38 +125,16 @@
     (make-flipping-fn climi::design1 climi::design2)))
 
 (defmethod %make-pixeled-design ((ink indexed-pattern))
-  (let* ((width (clim:pattern-width ink))
-         (height (clim:pattern-height ink))
-         (designs (map 'vector #'(lambda (ink)
-                                   (let ((pdesign (%make-pixeled-design ink)))
-                                     (if (region-contains-region-p
-                                          (pixeled-design-region pdesign)
-                                          (make-rectangle* 0 0 (1- width) (1- height)))
-                                         (pixeled-rgba-unsafe-fn pdesign)
-                                         (pixeled-rgba-fn pdesign))))
-                       (climi::pattern-designs ink))))
-    (declare (type (simple-array pixeled-design-fn (*)) designs))
-    (make-pixeled-functional-design
-     :color-fn (lambda (x y)
-		 (funcall (elt designs (aref (climi::pattern-array ink) y x)) x y))
-     :region (make-rectangle* 0 0
-                              (1- (clim:pattern-width ink))
-                              (1- (clim:pattern-height ink))))))
+  (make-pixeled-image-design :image (climi::%collapse-pattern ink)))
 
 (defmethod %make-pixeled-design ((ink rectangular-tile))
-  (let* ((design (%make-pixeled-design (rectangular-tile-design ink)))
-         (width (pattern-width ink))
-         (height (pattern-height ink))
-         (design-fn (if (region-contains-region-p
-                         (pixeled-design-region design)
-                         (make-rectangle* 0 0 (1- width) (1- height)))
-                        (pixeled-rgba-unsafe-fn design)
-                        (pixeled-rgba-fn design))))
+  (let ((design (climi::%collapse-pattern ink)))
     (make-pixeled-functional-design
      :color-fn (lambda (x y)
-                 (declare (type fixnum x y width height)
-                          (type pixeled-design-fn design-fn))
-                 (funcall design-fn (mod x width) (mod y height))))))
+                 (%rgba->vals
+                  (climi::%pattern-rgba-value design
+                                              (mod x (pattern-width design))
+                                              (mod y (pattern-height design))))))))
 
 (defgeneric %transform-design (design transformation)
   (:method (design transformation)
@@ -222,8 +155,6 @@
           (setf dx (round x0))
           (setf dy (round y0))
           (setf region (make-rectangle* (round x1) (round y1) (round x2) (round y2))))))
-    design)
-  (:method ((design pixeled-uniform-design) transformation)
     design))
 
 (defmethod %make-pixeled-design ((ink transformed-design))
@@ -245,14 +176,7 @@
 		       (declare (ignore r2 g2 b2))
 		       (values r1 g1 b1 (octet-mult a1 a2)))))
        :region (region-intersection (pixeled-design-region ink)
-                                    (pixeled-design-region mask)))))
-  (:method ((ink pixeled-uniform-design) (mask pixeled-uniform-design))
-    (make-pixeled-uniform-design
-     :red (pixeled-uniform-design-red ink)
-     :green (pixeled-uniform-design-green ink)
-     :blue (pixeled-uniform-design-blue ink)
-     :alpha (octet-mult (pixeled-uniform-design-alpha ink)
-                        (pixeled-uniform-design-alpha mask)))))
+                                    (pixeled-design-region mask))))))
 
 (defgeneric compose-out-rgba-design (ink mask)
   (:method ((ink pixeled-design) (mask pixeled-design))
@@ -267,14 +191,7 @@
 			 (funcall mask-fn x y)
 		       (declare (ignore r2 g2 b2))
 		       (values r1 g1 b1 (octet-mult a1 (- 255 a2))))))
-       :region (pixeled-design-region ink))))
-  (:method ((ink pixeled-uniform-design) (mask pixeled-uniform-design))
-    (make-pixeled-uniform-design
-     :red (pixeled-uniform-design-red ink)
-     :green (pixeled-uniform-design-green ink)
-     :blue (pixeled-uniform-design-blue ink)
-     :alpha (octet-mult (pixeled-uniform-design-alpha ink)
-                        (- 255 (pixeled-uniform-design-alpha mask))))))
+       :region (pixeled-design-region ink)))))
 
 (defgeneric compose-over-rgba-design (fore back)
   (:method ((fore pixeled-design) (back pixeled-design))
@@ -290,23 +207,7 @@
 		         (multiple-value-bind (red green blue alpha)
 			     (octet-blend-function
 			      r2 g2 b2 a2 r1 g1 b1 a1)
-			   (values red green blue alpha))))))))
-  (:method ((fore pixeled-uniform-design) (back pixeled-uniform-design))
-    (multiple-value-bind (red green blue alpha)
-        (octet-blend-function
-         (pixeled-uniform-design-red fore)
-         (pixeled-uniform-design-green fore)
-         (pixeled-uniform-design-blue fore)
-         (pixeled-uniform-design-alpha fore)
-         (pixeled-uniform-design-red back)
-         (pixeled-uniform-design-green back)
-         (pixeled-uniform-design-blue back)
-         (pixeled-uniform-design-alpha back))
-      (make-pixeled-uniform-design
-       :red red
-       :green green
-       :blue blue
-       :alpha alpha))))
+			   (values red green blue alpha)))))))))
 
 (defmethod %make-pixeled-design ((ink in-compositum))
   (let ((c-ink (make-pixeled-design (compositum-ink ink)))
