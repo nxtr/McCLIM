@@ -61,7 +61,6 @@
 		  #:image-mirror-image
 		  #:image-sheet-mixin
 		  #:image-pixmap-mixin
-                  #:image-pixels
                   #:image-pixmap-mixin
                   #:image-mirror-mixin)
    (:import-from :clim-clx

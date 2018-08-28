@@ -15,7 +15,7 @@
 (defmethod mcclim-render-internals::%create-mirror-image :after ((sheet clx-fb-mirror) w h)
   (with-slots (mcclim-render-internals::dirty-region) sheet
     (setf mcclim-render-internals::dirty-region nil))
-  ;;(let ((data (mcclim-render::image-pixels (image-mirror-image sheet))))
+  ;;(let ((data (climi::pattern-array (image-mirror-image sheet))))
     (with-slots (width height clx-image xlib-image) sheet
       (setf width w
 	    height h)
@@ -64,7 +64,7 @@
 		  (dpb red (byte 8 16) 0)))))
 
 (defun image-mirror-pre-put (width height xmirror sheet clx-image xlib-image dirty-r)
-  (let* ((pixels (image-pixels (image-mirror-image sheet)))
+  (let* ((pixels (climi::pattern-array (image-mirror-image sheet)))
          (fn (etypecase pixels
                ((simple-array (unsigned-byte 32) 2)
                 #'(lambda (region)

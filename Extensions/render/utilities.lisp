@@ -31,6 +31,21 @@ top-left. Useful when we iterate over the same array and mutate its state."
            (,a (ldb (byte 8 00) ,elt)))
        ,@body)))
 
+(defun %vals->rgba (r g b &optional (a #xff))
+  (declare (type octet r g b a)
+           (optimize (speed 3) (safety 0)))
+  (dpb r (byte 8 24) (dpb g (byte 8 16) (dpb b (byte 8 8) a))))
+
+(defun %rgba->vals (rgba)
+  (declare (type (unsigned-byte 32) rgba)
+           (optimize (speed 3) (safety 0)))
+  (values (ldb (byte 8 24) rgba)
+          (ldb (byte 8 16) rgba)
+          (ldb (byte 8 08) rgba)
+          (ldb (byte 8 00) rgba)))
+
+(declaim (inline %rgba->vals %vals->rgba))
+
 ;;; Returns T for valid arguments, NIL for malformed width/height and signals an
 ;;; error if coordinates go out of arrays bounds.
 (defun %check-coords (src-array dst-array sx sy dx dy width height)

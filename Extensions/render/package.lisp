@@ -10,7 +10,6 @@
    #:image
    #:draw-image*
    #:medium-draw-image*
-   #:image-pixels
    #:image-rgba-set-fn
    #:image-rgba-blend-fn
    #:image-gray-set-fn

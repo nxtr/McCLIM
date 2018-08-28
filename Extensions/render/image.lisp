@@ -3,15 +3,6 @@
 ;;;
 ;;; Image
 ;;;
-(defclass image (climi::%rgba-pattern)
-  ((climi::array :initarg :pixels
-                 :accessor image-pixels)))
-
-;;;
-;;; Image mixins
-;;;
-(defclass image-mixin ()
-  ())
 
 (defun draw-image* (medium image x y
                     &rest args
@@ -22,22 +13,6 @@
 
 (clim-internals::def-graphic-op draw-image* (image x y))
 
-(defun %vals->rgba (r g b &optional (a #xff))
-  (declare (type octet r g b a)
-           (optimize (speed 3) (safety 0)))
-  (dpb r (byte 8 24) (dpb g (byte 8 16) (dpb b (byte 8 8) a))))
-
-(defun %rgba->vals (rgba)
-  (declare (type (unsigned-byte 32) rgba)
-           (optimize (speed 3) (safety 0)))
-  (values (ldb (byte 8 24) rgba)
-          (ldb (byte 8 16) rgba)
-          (ldb (byte 8 08) rgba)
-          (ldb (byte 8 00) rgba)))
-
-(declaim (inline %rgba->vals %vals->rgba))
-
-
 ;;;
 ;;; Image operations
 ;;;
@@ -46,9 +21,62 @@
   "Create an empty transparent image of size WIDTH x HEIGHT."
   ;; XXX: something in text rendering depends image being transparent by
   ;; default. This should be fixed.
-  (make-instance 'rgba-image :array (make-array (list height width)
-                                                :element-type '(unsigned-byte 32)
-                                                :initial-element #xFFFFFF00)))
+  (make-instance 'climi::%rgba-pattern :array (make-array (list height width)
+                                                          :element-type '(unsigned-byte 32)
+                                                          :initial-element #xFFFFFF00)))
+
+(defmethod image-rgba-set-fn ((image climi::%rgba-pattern) &key (dx 0) (dy 0))
+  (let ((pixels (climi::pattern-array image)))
+    (declare (type (simple-array (unsigned-byte 32) 2) pixels))
+    (lambda (x y red green blue &optional (alpha 255))
+      (declare (type fixnum x y red green blue alpha))
+      (setf (aref pixels (+ y dy) (+ x dx))
+            (dpb red (byte 8 24)
+                 (dpb green (byte 8 16)
+                      (dpb blue (byte 8 8) (dpb alpha (byte 8 0) 0))))))))
+
+(defmethod image-rgba-blend-fn ((image climi::%rgba-pattern) &key (dx 0) (dy 0))
+  (let ((pixels (climi::pattern-array image)))
+    (declare (type (simple-array (unsigned-byte 32) 2) pixels))
+    (lambda (x y red green blue &optional (alpha 255))
+      (declare (type fixnum x y red green blue alpha))
+      (multiple-value-bind (r2 g2 b2 a2)
+          (let ((p (aref pixels (+ y dy) (+ x dx))))
+            (values (ldb (byte 8 24) p) (ldb (byte 8 16) p) (ldb (byte 8 8) p)
+                    (ldb (byte 8 0) p)))
+        (multiple-value-bind (red green blue alpha)
+            (octet-rgba-blend-function red green blue alpha r2 g2 b2 a2)
+          (setf (aref pixels (+ y dy) (+ x dx))
+                (dpb red (byte 8 24)
+                     (dpb green (byte 8 16)
+                          (dpb blue (byte 8 8)
+                               (dpb alpha (byte 8 0) 0))))))))))
+
+(defmethod image-rgba-xor-blend-fn ((image climi::%rgba-pattern) &key (dx 0) (dy 0))
+  (let ((pixels (climi::pattern-array image)))
+    (declare (type (simple-array (unsigned-byte 32) 2) pixels))
+    (lambda (x y red green blue alpha)
+      (declare (type fixnum x y red green blue alpha))
+      (multiple-value-bind (r2 g2 b2 a2)
+          (let ((p (aref pixels (+ y dy) (+ x dx))))
+            (values (ldb (byte 8 24) p) (ldb (byte 8 16) p) (ldb (byte 8 8) p)
+                    (ldb (byte 8 0) p)))
+        (multiple-value-bind (red green blue alpha)
+            (octet-rgba-blend-function (color-octet-xor r2 red)
+                                       (color-octet-xor g2 green)
+                                       (color-octet-xor b2 blue)
+                                       (color-octet-xor a2 alpha) r2 g2 b2 a2)
+          (setf (aref pixels (+ y dy) (+ x dx))
+                (dpb red (byte 8 24)
+                     (dpb green (byte 8 16)
+                          (dpb blue (byte 8 8)
+                               (dpb alpha (byte 8 0) 0))))))))))
+
+(defmethod image-gray-set-fn ((image climi::%rgba-pattern) &key (dx 0) (dy 0))
+   (let ((pixels (climi::pattern-array image)))
+     (lambda (x y gray)
+       (declare (type fixnum x y gray))
+       (setf (aref pixels (+ y dy) (+ x dx)) gray))))
 
 ;;; Unsafe versions of COPY-IMAGE. Caller must ensure that all arguments are
 ;;; valid and arrays are of proper type.
