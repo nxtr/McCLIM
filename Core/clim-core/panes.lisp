@@ -804,6 +804,7 @@ which changed during the current execution of CHANGING-SPACE-REQUIREMENTS.
                       ;; UX mixins
                       ;cut-and-paste-mixin
                       mouse-wheel-scroll-mixin
+                      permanent-medium-sheet-output-mixin
                       ;; protocol class with million mixins goes last
                       pane)
   ((foreground       :initarg :foreground
@@ -885,9 +886,7 @@ which changed during the current execution of CHANGING-SPACE-REQUIREMENTS.
 
 ;;; TOP-LEVEL-SHEET
 
-(defclass top-level-sheet-pane (;;permanent-medium-sheet-output-mixin
-				;;mirrored-sheet-mixin
-                                single-child-composite-pane)
+(defclass top-level-sheet-pane (single-child-composite-pane)
   ()
   (:documentation "For the first pane in the architecture"))
 
@@ -1329,10 +1328,7 @@ which changed during the current execution of CHANGING-SPACE-REQUIREMENTS.
   (frob horizontally hbox-pane hrack-pane equalize-height)
   (frob vertically vbox-pane vrack-pane equalize-width))
 
-(defclass box-pane (box-layout-mixin
-		    composite-pane
-		    permanent-medium-sheet-output-mixin ;arg!
-		    )
+(defclass box-pane (box-layout-mixin composite-pane)
   ()
   (:documentation "Superclass for hbox-pane and vbox-pane that provides the
 		    initialization common to both."))
@@ -1644,8 +1640,7 @@ which changed during the current execution of CHANGING-SPACE-REQUIREMENTS.
 ;;; SPACING PANE
 
 (defclass spacing-pane (;;standard-space-requirement-options-mixin
-			single-child-composite-pane
-                        permanent-medium-sheet-output-mixin)
+			single-child-composite-pane)
   ((border-width :initarg :thickness
                  :initform 1))
   (:documentation "Never trust a random documentation string."))
@@ -1717,7 +1712,7 @@ which changed during the current execution of CHANGING-SPACE-REQUIREMENTS.
 
 ;;; RAISED PANE
 
-(defclass raised-pane (border-pane permanent-medium-sheet-output-mixin)
+(defclass raised-pane (border-pane)
   ()
   (:default-initargs
    :border-width 2))
@@ -1734,7 +1729,7 @@ which changed during the current execution of CHANGING-SPACE-REQUIREMENTS.
 
 ;;; LOWERED PANE
 
-(defclass lowered-pane (border-pane permanent-medium-sheet-output-mixin)
+(defclass lowered-pane (border-pane)
   ()
   (:default-initargs
    :border-width 2))
@@ -2265,7 +2260,7 @@ SCROLLER-PANE appear on the ergonomic left hand side, or leave set to
 
 ;;; LABEL PANE
 
-(defclass label-pane (composite-pane  permanent-medium-sheet-output-mixin)
+(defclass label-pane (composite-pane)
   ((label :type string
           :initarg :label
           :accessor label-pane-label
@@ -2460,7 +2455,6 @@ SCROLLER-PANE appear on the ergonomic left hand side, or leave set to
 
 (defclass clim-stream-pane (updating-output-stream-mixin
 			    pane-display-mixin
-			    permanent-medium-sheet-output-mixin
                             #-clim-mp standard-repainting-mixin
                             standard-extended-input-stream
                             standard-extended-output-stream
