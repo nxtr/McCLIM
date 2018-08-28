@@ -13,9 +13,7 @@
                (:file "utilities")
                (:file "color")
                (:file "image")
-               (:file "image-prim")
-               (:file "pixeled-design")
-               (:file "recording")))
+               (:file "pixeled-design")))
 
 (defsystem #:mcclim-render/render
     :depends-on (#:mcclim-render/core #:cl-vectors)

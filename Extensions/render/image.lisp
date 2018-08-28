@@ -25,7 +25,12 @@
                                                           :element-type '(unsigned-byte 32)
                                                           :initial-element #xFFFFFF00)))
 
-(defmethod image-rgba-set-fn ((image climi::%rgba-pattern) &key (dx 0) (dy 0))
+(deftype image-rgba-set-fn () '(function (fixnum fixnum octet octet octet octet)))
+(deftype image-rgba-blend-fn () '(function (fixnum fixnum octet octet octet octet)))
+(deftype image-rgba-xor-blend-fn () '(function (fixnum fixnum octet octet octet octet)))
+(deftype image-gray-set-fn () '(function (fixnum fixnum octet octet)))
+
+(defun image-rgba-set-fn (image &key (dx 0) (dy 0))
   (let ((pixels (climi::pattern-array image)))
     (declare (type (simple-array (unsigned-byte 32) 2) pixels))
     (lambda (x y red green blue &optional (alpha 255))
@@ -35,7 +40,7 @@
                  (dpb green (byte 8 16)
                       (dpb blue (byte 8 8) (dpb alpha (byte 8 0) 0))))))))
 
-(defmethod image-rgba-blend-fn ((image climi::%rgba-pattern) &key (dx 0) (dy 0))
+(defun image-rgba-blend-fn (image &key (dx 0) (dy 0))
   (let ((pixels (climi::pattern-array image)))
     (declare (type (simple-array (unsigned-byte 32) 2) pixels))
     (lambda (x y red green blue &optional (alpha 255))
@@ -52,7 +57,7 @@
                           (dpb blue (byte 8 8)
                                (dpb alpha (byte 8 0) 0))))))))))
 
-(defmethod image-rgba-xor-blend-fn ((image climi::%rgba-pattern) &key (dx 0) (dy 0))
+(defun image-rgba-xor-blend-fn (image &key (dx 0) (dy 0))
   (let ((pixels (climi::pattern-array image)))
     (declare (type (simple-array (unsigned-byte 32) 2) pixels))
     (lambda (x y red green blue alpha)
@@ -72,7 +77,7 @@
                           (dpb blue (byte 8 8)
                                (dpb alpha (byte 8 0) 0))))))))))
 
-(defmethod image-gray-set-fn ((image climi::%rgba-pattern) &key (dx 0) (dy 0))
+(defun image-gray-set-fn (image &key (dx 0) (dy 0))
    (let ((pixels (climi::pattern-array image)))
      (lambda (x y gray)
        (declare (type fixnum x y gray))
