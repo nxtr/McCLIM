@@ -10,17 +10,8 @@
 ;;;
 (defclass pixeled-design ()
   ((region :initarg :region :initform +everywhere+ :type region
-           :accessor pixeled-design-region)))
-
-(defgeneric pixeled-rgba-fn (design))
-(defgeneric pixeled-rgba-unsafe-fn (design))
-
-(defmethod pixeled-rgba-fn :around (design)
-  (with-slots (region)
-      design
-    (if (region-equal region +everywhere+)
-        (pixeled-rgba-unsafe-fn design)
-        (call-next-method))))
+           :accessor pixeled-design-region)
+   (color-fn :initarg :color-fn :type pixeled-design-fn :reader pixeled-rgba-fn)))
 
 (defmethod climi::%pattern-rgba-value ((pattern pixeled-design) x y)
   (multiple-value-bind (red green blue alpha) (funcall (pixeled-rgba-fn pattern) x y)
@@ -35,27 +26,9 @@
 ;;;
 ;;; Functiona Design
 ;;;
-(defclass pixeled-functional-design (pixeled-design)
-  ((color-fn :initarg :color-fn :type pixeled-design-fn)))
 
 (defun make-pixeled-functional-design (&key color-fn (region +everywhere+))
-  (make-instance 'pixeled-functional-design :color-fn color-fn :region region))
-
-(defmethod pixeled-rgba-fn ((design pixeled-functional-design))
-  (with-slots (color-fn region)
-      design
-    (declare (type pixeled-design-fn color-fn))
-    (lambda (x y)
-      (declare (type fixnum x y))
-      (if (clim:region-contains-position-p region x y)
-          (funcall color-fn x y)
-          (values 0 0 0 0)))))
-
-(defmethod pixeled-rgba-unsafe-fn ((design pixeled-functional-design))
-  (with-slots (color-fn region)
-      design
-    (declare (type pixeled-design-fn color-fn))
-    color-fn))
+  (make-instance 'pixeled-design :color-fn color-fn :region region))
 
 ;;;
 ;;; Make a pixeled design
@@ -119,28 +92,34 @@
 
 (defgeneric compose-in-rgba-design (ink mask)
   (:method (ink mask)
-    (make-pixeled-functional-design
-     :color-fn (lambda (x y)
-                 (multiple-value-bind (r1 g1 b1 a1)
-                     (%rgba->vals (climi::%pattern-rgba-value ink x y))
-                   (multiple-value-bind (r2 g2 b2 a2)
-                       (%rgba->vals (climi::%pattern-rgba-value mask x y))
-                     (declare (ignore r2 g2 b2))
-                     (values r1 g1 b1 (octet-mult a1 a2)))))
-     :region (region-intersection (pixeled-design-region ink)
-                                  (pixeled-design-region mask)))))
+    (let ((region (region-intersection (pixeled-design-region ink)
+                                       (pixeled-design-region mask))))
+      (make-pixeled-functional-design
+       :color-fn (lambda (x y)
+                   (if (clim:region-contains-position-p region x y)
+                       (multiple-value-bind (r1 g1 b1 a1)
+                           (%rgba->vals (climi::%pattern-rgba-value ink x y))
+                         (multiple-value-bind (r2 g2 b2 a2)
+                             (%rgba->vals (climi::%pattern-rgba-value mask x y))
+                           (declare (ignore r2 g2 b2))
+                           (values r1 g1 b1 (octet-mult a1 a2))))
+                       (values 0 0 0 0)))
+       :region region))))
 
 (defgeneric compose-out-rgba-design (ink mask)
   (:method (ink mask)
-    (make-pixeled-functional-design
-     :color-fn (lambda (x y)
-                 (multiple-value-bind (r1 g1 b1 a1)
-                     (%rgba->vals (climi::%pattern-rgba-value ink x y))
-                   (multiple-value-bind (r2 g2 b2 a2)
-                       (%rgba->vals (climi::%pattern-rgba-value mask x y))
-                     (declare (ignore r2 g2 b2))
-                     (values r1 g1 b1 (octet-mult a1 (- 255 a2))))))
-     :region (pixeled-design-region ink))))
+    (let ((region (pixeled-design-region ink)))
+      (make-pixeled-functional-design
+       :color-fn (lambda (x y)
+                   (if (clim:region-contains-position-p region x y)
+                       (multiple-value-bind (r1 g1 b1 a1)
+                           (%rgba->vals (climi::%pattern-rgba-value ink x y))
+                         (multiple-value-bind (r2 g2 b2 a2)
+                             (%rgba->vals (climi::%pattern-rgba-value mask x y))
+                           (declare (ignore r2 g2 b2))
+                           (values r1 g1 b1 (octet-mult a1 (- 255 a2)))))
+                       (values 0 0 0 0)))
+       :region region))))
 
 (defgeneric compose-over-rgba-design (fore back)
   (:method (fore back)
