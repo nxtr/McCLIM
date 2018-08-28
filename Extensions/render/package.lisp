@@ -10,18 +10,10 @@
    #:image
    #:draw-image*
    #:medium-draw-image*
-   #:make-image-design
    #:image-pixels
-   #:image-rgba-get-fn
    #:image-rgba-set-fn
    #:image-rgba-blend-fn
-   #:image-gray-get-fn
    #:image-gray-set-fn
-   #:image-gray-blend-fn
-   #:image-gray-alpha-get-fn
-   #:image-alpha-get-fn
-   #:image-alpha-set-fn
-   #:image-alpha-blend-fn
    ;; design
    #:make-pixeled-design
    ;; image ops
@@ -62,18 +54,6 @@
    #:gray->rgba
    #:gray->rgb
    #:gray->alpha
-   ;; image
-   #:image-design
-   #:image-rgba-get-code
-   #:image-rgba-set-code
-   #:image-rgba-blend-code
-   #:image-gray-get-code
-   #:image-gray-set-code
-   #:image-gray-alpha-get-code
-   #:image-gray-blend-code
-   #:image-alpha-get-code
-   #:image-alpha-set-code
-   #:image-alpha-blend-code
    ;; design
    #:pixeled-design
    #:pixeled-uniform-design

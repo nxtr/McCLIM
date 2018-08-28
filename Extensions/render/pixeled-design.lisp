@@ -58,43 +58,6 @@
     color-fn))
 
 ;;;
-;;; Flippend Design
-;;;
-(defclass pixeled-flipping-design (pixeled-functional-design)
-  ())
-
-(defun make-pixeled-flipping-design (&key color-fn (region +everywhere+))
-  (make-instance 'pixeled-flipping-design :color-fn color-fn :region region))
-
-;;;
-;;; Image Design
-;;;
-(defclass pixeled-image-design (pixeled-design)
-  ((image :initarg :image :initform nil
-          :accessor pixeled-image-design-image)
-   (dx :initarg :dx :initform 0 :type fixnum
-       :accessor pixeled-image-design-dx)
-   (dy :initarg :dy :initform 0 :type fixnum
-       :accessor pixeled-image-design-dy)))
-
-(defun make-pixeled-image-design (&key (image nil))
-  (make-instance 'pixeled-image-design
-                 :image image
-                 :region (make-rectangle* 0 0
-                                          (1- (pattern-width image))
-                                          (1- (pattern-height image)))))
-
-(defmethod  pixeled-rgba-fn ((design pixeled-image-design))
-  (with-slots (image dx dy region)
-      design
-    (image-rgba-get-fn image :dx dx :dy dy :region region)))
-
-(defmethod  pixeled-rgba-unsafe-fn ((design pixeled-image-design))
-  (with-slots (image dx dy region)
-      design
-    (image-rgba-get-fn image :dx dx :dy dy :region nil)))
-
-;;;
 ;;; Make a pixeled design
 ;;;
 (defgeneric %make-pixeled-design (design))
@@ -125,7 +88,10 @@
     (make-flipping-fn climi::design1 climi::design2)))
 
 (defmethod %make-pixeled-design ((ink indexed-pattern))
-  (make-pixeled-image-design :image (climi::%collapse-pattern ink)))
+  (let ((design (climi::%collapse-pattern ink)))
+    (make-pixeled-functional-design
+     :color-fn (lambda (x y)
+                 (%rgba->vals (climi::%pattern-rgba-value design x y))))))
 
 (defmethod %make-pixeled-design ((ink rectangular-tile))
   (let ((design (climi::%collapse-pattern ink)))
@@ -144,18 +110,7 @@
        :color-fn (lambda (x y)
                    (declare (type fixnum x y))
                    (with-transformed-position (transformation x y)
-                     (funcall design-fn (round x) (round y)))))))
-  (:method ((design pixeled-image-design) (transformation climi::standard-translation))
-    (with-slots (dx dy region)
-        design
-      (multiple-value-bind (x0 y0)
-          (transform-position transformation dx dy)
-        (with-bounding-rectangle* (x1 y1 x2 y2)
-            (transform-region (invert-transformation transformation) region)
-          (setf dx (round x0))
-          (setf dy (round y0))
-          (setf region (make-rectangle* (round x1) (round y1) (round x2) (round y2))))))
-    design))
+                     (funcall design-fn (round x) (round y))))))))
 
 (defmethod %make-pixeled-design ((ink transformed-design))
   (let ((design (%make-pixeled-design (transformed-design-design ink)))
@@ -215,13 +170,7 @@
 	(c-back (make-pixeled-design (compositum-background ink))))
     (compose-over-rgba-design c-fore c-back)))
 
-(defmethod %make-pixeled-design ((ink image-design))
-  (let* ((img (slot-value ink 'image)))
-    (make-pixeled-image-design :image img)))
-
 (defmethod %make-pixeled-design ((ink climi::%rgba-pattern))
-  (make-instance 'pixeled-image-design
-                 :image ink
-                 :region (make-rectangle* 0 0
-                                          (1- (pattern-width ink))
-                                          (1- (pattern-height ink)))))
+  (make-pixeled-functional-design
+   :color-fn (lambda (x y)
+               (%rgba->vals (climi::%pattern-rgba-value ink x y)))))

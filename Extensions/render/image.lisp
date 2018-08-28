@@ -39,22 +39,6 @@
 
 
 ;;;
-;;; Image Design
-;;;
-(defclass image-design (design)
-  ((image :reader image
-          :initarg :image)))
-
-(defun make-image-design (image)
-  (make-instance 'image-design :image image))
-
-(defmethod clim:draw-design
-    (medium (design image-design) &rest options
-     &key (x 0) (y 0) &allow-other-keys)
-  (climi::with-medium-options (medium options)
-    (draw-pattern* medium (slot-value design 'image) x y)))
-
-;;;
 ;;; Image operations
 ;;;
 

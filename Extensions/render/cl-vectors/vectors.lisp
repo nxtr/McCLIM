@@ -42,6 +42,9 @@
                                  nil
                                  clip-region)))
     (clim:with-bounding-rectangle* (min-x min-y max-x max-y) clip-region
+      (setf draw-function (aa-render-draw-fn image current-clip-region ink)
+            draw-span-function (aa-render-draw-span-fn image current-clip-region ink))
+      #+ (or)
       (if (typep ink 'pixeled-flipping-design)
           (setf draw-function (aa-render-xor-draw-fn image current-clip-region ink)
                 draw-span-function (aa-render-xor-draw-span-fn image current-clip-region ink))

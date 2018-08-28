@@ -186,13 +186,12 @@
 (defun render-image-test-08 (stream h)
   (let ((path (uiop/pathname:merge-pathnames* *testing-image-rgb-file* *testing-image-directory*)))
     (let ((image (make-pattern-from-bitmap-file path)))
-      (draw-design stream (clim-render:make-image-design image) :x 10 :y h))))
+      (draw-design stream image :x 10 :y h))))
 
 (defun render-image-test-09 (stream transformation)
   (let ((path (uiop/pathname:merge-pathnames* *testing-image-rgb-file* *testing-image-directory*)))
     (let ((image (make-pattern-from-bitmap-file path)))
-      (draw-design stream (clim-render:make-image-design image) :x 0 :y 0
-                   :transformation transformation))))
+      (draw-design stream image :x 0 :y 0 :transformation transformation))))
 
 (defun render-image-test-10 (stream transformation clipping-region)
   (let ((path (uiop/pathname:merge-pathnames* *testing-image-rgb-file* *testing-image-directory*)))
@@ -203,7 +202,7 @@
       (with-bounding-rectangle* (x1 y1 x2 y2)
           (transform-region transformation clipping-region)
         (draw-rectangle* stream x1 y1 x2 y2 :ink +blue+ :filled nil))
-      (draw-design stream (clim-render:make-image-design image) :x 0 :y 0
+      (draw-design stream image :x 0 :y 0
                    :transformation transformation
                    :clipping-region clipping-region))))
 
